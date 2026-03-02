@@ -112,8 +112,8 @@ void UIScene_AbstractContainerMenu::PlatformInitialize(int iPad, int startIndex)
 #ifdef __ORBIS__
 	// we need to map the touchpad rectangle to the UI rectangle. While it works great for the creative menu, it is much too sensitive for the smaller menus.
 	//X coordinate of the touch point (0 to 1919)    
-	//Y coordinate of the touch point (0 to 941: DUALSHOCKï¿½4 wireless controllers and the CUH-ZCT1J/CAP-ZCT1J/CAP-ZCT1U controllers for the PlayStationï¿½4 development tool,    
-	//0 to 753: JDX-1000x series controllers for the PlayStationï¿½4 development tool,)     
+	//Y coordinate of the touch point (0 to 941: DUALSHOCK®4 wireless controllers and the CUH-ZCT1J/CAP-ZCT1J/CAP-ZCT1U controllers for the PlayStation®4 development tool,    
+	//0 to 753: JDX-1000x series controllers for the PlayStation®4 development tool,)     
 	m_fTouchPadMulX=fPanelWidth/1919.0f;
 	m_fTouchPadMulY=fPanelHeight/941.0f;
 	m_fTouchPadDeadZoneX=15.0f*m_fTouchPadMulX;
@@ -179,7 +179,7 @@ void UIScene_AbstractContainerMenu::tick()
 {
 	UIScene::tick();
 
-#ifdef _WINDOWS64
+	#ifdef _WINDOWS64
 	bool mouseActive = (m_iPad == 0 && !KMInput.IsCaptured());
 	float rawMouseMovieX = 0, rawMouseMovieY = 0;
 	// Map Windows mouse position to the virtual pointer in movie coordinates
@@ -204,11 +204,11 @@ void UIScene_AbstractContainerMenu::tick()
 			rawMouseMovieY = my;
 		}
 	}
-#endif
+	#endif
 
 	onMouseTick();
 
-#ifdef _WINDOWS64
+	#ifdef _WINDOWS64
 	// Dispatch mouse clicks AFTER onMouseTick() has updated m_eCurrSection from the new pointer position
 	if (mouseActive)
 	{
@@ -247,7 +247,7 @@ void UIScene_AbstractContainerMenu::tick()
 			handleKeyDown(m_iPad, ACTION_MENU_Y, false);
 		}
 
-		// Mouse scroll wheel for page scrolling
+		// Mouse scroll wheel for page switching
 		int scrollDelta = KMInput.ConsumeScrollDelta();
 		if (scrollDelta > 0)
 		{
@@ -258,20 +258,18 @@ void UIScene_AbstractContainerMenu::tick()
 			handleKeyDown(m_iPad, ACTION_MENU_OTHER_STICK_DOWN, false);
 		}
 
-		// ESC to close â€” must be last since it may destroy this scene
+		// ESC to close ? must be last since it may destroy this scene
 		if (KMInput.ConsumeKeyPress(VK_ESCAPE))
 		{
 			handleKeyDown(m_iPad, ACTION_MENU_B, false);
 			return;
 		}
 	}
-#endif
+	#endif
 
 	IggyEvent mouseEvent;
 	S32 width, height;
-	m_parentLayer->getRenderDimensions(width, height);
-
-#ifdef _WINDOWS64
+	#ifdef _WINDOWS64
 	S32 x, y;
 	if (mouseActive)
 	{
@@ -287,10 +285,10 @@ void UIScene_AbstractContainerMenu::tick()
 		x = (S32)(m_pointerPos.x * ((float)width / m_movieWidth));
 		y = (S32)(m_pointerPos.y * ((float)height / m_movieHeight));
 	}
-#else
+	#else
 	S32 x = m_pointerPos.x*((float)width/m_movieWidth);
 	S32 y = m_pointerPos.y*((float)height/m_movieHeight);
-#endif
+	#endif
 	IggyMakeEventMouseMove( &mouseEvent, x, y);
 
 	// 4J Stu - This seems to be broken on Durango, so do it ourself

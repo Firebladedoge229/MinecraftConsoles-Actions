@@ -29,8 +29,6 @@ public:
 
 	// original code
 	virtual void TemporaryCreateGameStart();
-
-	bool m_bShutdown;
 };
 
 extern CConsoleMinecraftApp app;

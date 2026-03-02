@@ -62,7 +62,7 @@ UIScene_LoadMenu::UIScene_LoadMenu(int iPad, void *initData, UILayer *parentLaye
 
 	LoadMenuInitData *params = (LoadMenuInitData *)initData;
 
-	m_labelGameName.init(app.GetString(IDS_WORLD_NAME));
+	//m_labelGameName.init(app.GetString(IDS_WORLD_NAME));
 	m_labelSeed.init(L"");
 	m_labelCreatedMode.init(app.GetString(IDS_CREATED_IN_SURVIVAL));
 
@@ -1337,14 +1337,7 @@ int UIScene_LoadMenu::LoadDataComplete(void *pParam)
 #endif
 			else
 			{
-#ifdef _WINDOWS64
-				// On Windows64, IsSignedInLive() returns true as a stub but Xbox Live is
-				// not available. Skip QuadrantSignin and proceed directly with local play.
-				DWORD dwLocalUsersMask = CGameNetworkManager::GetLocalPlayerMask(ProfileManager.GetPrimaryPad());
-				StartGameFromSave(pClass, dwLocalUsersMask);
-#else
 				pClass->m_bRequestQuadrantSignin = true;
-#endif
 			}
 		}
 	}

@@ -692,7 +692,7 @@ int CMinecraftApp::SetDefaultOptions(C_4JProfile::PROFILESETTINGS *pSettings,con
 {
 	SetGameSettings(iPad,eGameSetting_MusicVolume,DEFAULT_VOLUME_LEVEL);
 	SetGameSettings(iPad,eGameSetting_SoundFXVolume,DEFAULT_VOLUME_LEVEL);
-	SetGameSettings(iPad,eGameSetting_Gamma,50);
+	SetGameSettings(iPad,eGameSetting_Gamma,100);
 
 	// 4J-PB - Don't reset the difficult level if we're in-game
 	if(Minecraft::GetInstance()->level==NULL)
@@ -1183,6 +1183,10 @@ void CMinecraftApp::ActionGameSettings(int iPad,eGameSetting eVal)
 			// ucGamma range is 0-100, UpdateGamma is 0 - 32768
 			float fVal=((float)GameSettingsA[iPad]->ucGamma)*327.68f;
 			RenderManager.UpdateGamma((unsigned short)fVal);
+#ifdef _WINDOWS64
+			extern void Windows64_UpdateGamma(unsigned short);
+			Windows64_UpdateGamma((unsigned short)fVal);
+#endif
 		}				
 
 		break;
@@ -8956,11 +8960,7 @@ bool CMinecraftApp::IsLocalMultiplayerAvailable()
 		if( InputManager.IsPadConnected(i) || ProfileManager.IsSignedIn(i) ) ++connectedControllers;
 	}
 
-#ifdef _WINDOWS64
-	bool available = connectedControllers > 1;
-#else
 	bool available = RenderManager.IsHiDef() && connectedControllers > 1;
-#endif
 
 #ifdef __ORBIS__
 	// Check for remote play

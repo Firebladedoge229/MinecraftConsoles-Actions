@@ -21,6 +21,7 @@
 #include "..\ClientConnection.h"
 #include "..\User.h"
 #include "..\..\Minecraft.World\Socket.h"
+#include "..\KeyboardMouseInput.h"
 #include "..\..\Minecraft.World\ThreadName.h"
 #include "..\..\Minecraft.Client\StatsCounter.h"
 #include "..\ConnectScreen.h"
@@ -36,12 +37,9 @@
 #include "Resource.h"
 #include "..\..\Minecraft.World\compression.h"
 #include "..\..\Minecraft.World\OldChunkStorage.h"
+#include "Network\WinsockNetLayer.h"
 
 #include "Xbox/resource.h"
-
-#ifdef _MSC_VER
-#pragma comment(lib, "legacy_stdio_definitions.lib")
-#endif
 
 HINSTANCE hMyInst;
 LRESULT CALLBACK DlgProc(HWND hWndDlg, UINT Msg, WPARAM wParam, LPARAM lParam);
@@ -86,6 +84,9 @@ int g_iScreenHeight = 1080;
 // Fullscreen toggle state
 static bool g_isFullscreen = false;
 static WINDOWPLACEMENT g_wpPrev = { sizeof(g_wpPrev) };
+
+char g_Win64Username[17] = {0};
+wchar_t g_Win64UsernameW[17] = {0};
 
 void DefineActions(void)
 {
@@ -185,11 +186,11 @@ void DefineActions(void)
 	InputManager.SetGameJoypadMaps(MAP_STYLE_1,MINECRAFT_ACTION_CRAFTING,				_360_JOY_BUTTON_X);
 	InputManager.SetGameJoypadMaps(MAP_STYLE_1,MINECRAFT_ACTION_RENDER_THIRD_PERSON,	_360_JOY_BUTTON_RTHUMB);
 	InputManager.SetGameJoypadMaps(MAP_STYLE_1,MINECRAFT_ACTION_GAME_INFO,				_360_JOY_BUTTON_BACK);
-
+	
 	InputManager.SetGameJoypadMaps(MAP_STYLE_1,MINECRAFT_ACTION_DPAD_LEFT,				_360_JOY_BUTTON_DPAD_LEFT);
 	InputManager.SetGameJoypadMaps(MAP_STYLE_1,MINECRAFT_ACTION_DPAD_RIGHT,				_360_JOY_BUTTON_DPAD_RIGHT);
 	InputManager.SetGameJoypadMaps(MAP_STYLE_1,MINECRAFT_ACTION_DPAD_UP,				_360_JOY_BUTTON_DPAD_UP);
-	InputManager.SetGameJoypadMaps(MAP_STYLE_1,MINECRAFT_ACTION_DPAD_DOWN,				_360_JOY_BUTTON_DPAD_DOWN);
+	InputManager.SetGameJoypadMaps(MAP_STYLE_1,MINECRAFT_ACTION_DPAD_DOWN,				_360_JOY_BUTTON_DPAD_DOWN);	
 
 	InputManager.SetGameJoypadMaps(MAP_STYLE_2,ACTION_MENU_A,							_360_JOY_BUTTON_A);
 	InputManager.SetGameJoypadMaps(MAP_STYLE_2,ACTION_MENU_B,							_360_JOY_BUTTON_B);
@@ -234,11 +235,11 @@ void DefineActions(void)
 	InputManager.SetGameJoypadMaps(MAP_STYLE_2,ACTION_MENU_OTHER_STICK_DOWN,			_360_JOY_BUTTON_RSTICK_DOWN);
 	InputManager.SetGameJoypadMaps(MAP_STYLE_2,ACTION_MENU_OTHER_STICK_LEFT,			_360_JOY_BUTTON_RSTICK_LEFT);
 	InputManager.SetGameJoypadMaps(MAP_STYLE_2,ACTION_MENU_OTHER_STICK_RIGHT,			_360_JOY_BUTTON_RSTICK_RIGHT);
-
+	
 	InputManager.SetGameJoypadMaps(MAP_STYLE_2,MINECRAFT_ACTION_DPAD_LEFT,				_360_JOY_BUTTON_DPAD_LEFT);
 	InputManager.SetGameJoypadMaps(MAP_STYLE_2,MINECRAFT_ACTION_DPAD_RIGHT,				_360_JOY_BUTTON_DPAD_RIGHT);
 	InputManager.SetGameJoypadMaps(MAP_STYLE_2,MINECRAFT_ACTION_DPAD_UP,				_360_JOY_BUTTON_DPAD_UP);
-	InputManager.SetGameJoypadMaps(MAP_STYLE_2,MINECRAFT_ACTION_DPAD_DOWN,				_360_JOY_BUTTON_DPAD_DOWN);
+	InputManager.SetGameJoypadMaps(MAP_STYLE_2,MINECRAFT_ACTION_DPAD_DOWN,				_360_JOY_BUTTON_DPAD_DOWN);	
 }
 
 #if 0
@@ -265,7 +266,7 @@ HRESULT InitD3D( IDirect3DDevice9 **ppDevice,
 	pd3dPP->EnableAutoDepthStencil = TRUE;
 	pd3dPP->AutoDepthStencilFormat = D3DFMT_D24S8;
 	pd3dPP->SwapEffect             = D3DSWAPEFFECT_DISCARD;
-	pd3dPP->PresentationInterval   = D3DPRESENT_INTERVAL_IMMEDIATE;
+	pd3dPP->PresentationInterval   = D3DPRESENT_INTERVAL_ONE;
 	//pd3dPP->Flags				   = D3DPRESENTFLAG_NO_LETTERBOX;
 	//ERR[D3D]: Can't set D3DPRESENTFLAG_NO_LETTERBOX when wide-screen is enabled
 	//	in the launcher/dashboard.
@@ -298,11 +299,99 @@ void MemSect(int sect)
 
 HINSTANCE               g_hInst = NULL;
 HWND                    g_hWnd = NULL;
+
+static bool g_isFullscreen = false;
+static RECT g_windowedRect = {};
+static LONG g_windowedStyle = 0;
+
+void ToggleFullscreen()
+{
+	if (!g_hWnd) return;
+
+	if (!g_isFullscreen)
+	{
+		g_windowedStyle = GetWindowLong(g_hWnd, GWL_STYLE);
+		GetWindowRect(g_hWnd, &g_windowedRect);
+
+		HMONITOR hMon = MonitorFromWindow(g_hWnd, MONITOR_DEFAULTTONEAREST);
+		MONITORINFO mi = { sizeof(mi) };
+		GetMonitorInfo(hMon, &mi);
+
+		SetWindowLong(g_hWnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+		SetWindowPos(g_hWnd, HWND_TOP,
+			mi.rcMonitor.left, mi.rcMonitor.top,
+			mi.rcMonitor.right - mi.rcMonitor.left,
+			mi.rcMonitor.bottom - mi.rcMonitor.top,
+			SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
+
+		g_isFullscreen = true;
+	}
+	else
+	{
+		SetWindowLong(g_hWnd, GWL_STYLE, g_windowedStyle);
+		SetWindowPos(g_hWnd, HWND_NOTOPMOST,
+			g_windowedRect.left, g_windowedRect.top,
+			g_windowedRect.right - g_windowedRect.left,
+			g_windowedRect.bottom - g_windowedRect.top,
+			SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
+
+		g_isFullscreen = false;
+	}
+
+	if (g_KBMInput.IsWindowFocused())
+		g_KBMInput.SetWindowFocused(true);
+}
 D3D_DRIVER_TYPE         g_driverType = D3D_DRIVER_TYPE_NULL;
 D3D_FEATURE_LEVEL       g_featureLevel = D3D_FEATURE_LEVEL_11_0;
 ID3D11Device*           g_pd3dDevice = NULL;
 ID3D11DeviceContext*    g_pImmediateContext = NULL;
 IDXGISwapChain*         g_pSwapChain = NULL;
+
+static WORD g_originalGammaRamp[3][256];
+static bool g_gammaRampSaved = false;
+
+void Windows64_UpdateGamma(unsigned short usGamma)
+{
+	if (!g_hWnd) return;
+
+	HDC hdc = GetDC(g_hWnd);
+	if (!hdc) return;
+
+	if (!g_gammaRampSaved)
+	{
+		GetDeviceGammaRamp(hdc, g_originalGammaRamp);
+		g_gammaRampSaved = true;
+	}
+
+	float gamma = (float)usGamma / 32768.0f;
+	if (gamma < 0.01f) gamma = 0.01f;
+	if (gamma > 1.0f) gamma = 1.0f;
+
+	float invGamma = 1.0f / (0.5f + gamma * 0.5f);
+
+	WORD ramp[3][256];
+	for (int i = 0; i < 256; i++)
+	{
+		float normalized = (float)i / 255.0f;
+		float corrected = powf(normalized, invGamma);
+		WORD val = (WORD)(corrected * 65535.0f + 0.5f);
+		ramp[0][i] = val;
+		ramp[1][i] = val;
+		ramp[2][i] = val;
+	}
+
+	SetDeviceGammaRamp(hdc, ramp);
+	ReleaseDC(g_hWnd, hdc);
+}
+
+void Windows64_RestoreGamma()
+{
+	if (!g_gammaRampSaved || !g_hWnd) return;
+	HDC hdc = GetDC(g_hWnd);
+	if (!hdc) return;
+	SetDeviceGammaRamp(hdc, g_originalGammaRamp);
+	ReleaseDC(g_hWnd, hdc);
+}
 ID3D11RenderTargetView* g_pRenderTargetView = NULL;
 ID3D11DepthStencilView* g_pDepthStencilView = NULL;
 ID3D11Texture2D*		g_pDepthStencilBuffer = NULL;
@@ -348,63 +437,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		PostQuitMessage(0);
 		break;
 
-	// Keyboard/Mouse input handling
-	case WM_KEYDOWN:
-		if (!(lParam & 0x40000000)) // ignore auto-repeat
-			KMInput.OnKeyDown(wParam);
-		break;
-	case WM_KEYUP:
-		KMInput.OnKeyUp(wParam);
-		break;
-	case WM_SYSKEYDOWN:
-		if (wParam == VK_MENU) // Alt key
-		{
-			if (!(lParam & 0x40000000))
-				KMInput.OnKeyDown(wParam);
-			return 0; // prevent default Alt behavior
-		}
-		return DefWindowProc(hWnd, message, wParam, lParam);
-	case WM_SYSKEYUP:
-		if (wParam == VK_MENU)
-		{
-			KMInput.OnKeyUp(wParam);
-			return 0;
-		}
-		return DefWindowProc(hWnd, message, wParam, lParam);
-	case WM_INPUT:
-		KMInput.OnRawMouseInput(lParam);
-		break;
-	case WM_LBUTTONDOWN:
-		KMInput.OnMouseButton(0, true);
-		break;
-	case WM_LBUTTONUP:
-		KMInput.OnMouseButton(0, false);
-		break;
-	case WM_RBUTTONDOWN:
-		KMInput.OnMouseButton(1, true);
-		break;
-	case WM_RBUTTONUP:
-		KMInput.OnMouseButton(1, false);
-		break;
-	case WM_MBUTTONDOWN:
-		KMInput.OnMouseButton(2, true);
-		break;
-	case WM_MBUTTONUP:
-		KMInput.OnMouseButton(2, false);
-		break;
-	case WM_MOUSEWHEEL:
-		KMInput.OnMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
-		break;
-	case WM_MOUSEMOVE:
-		KMInput.OnMouseMove(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-		break;
-	case WM_ACTIVATE:
-		if (LOWORD(wParam) == WA_INACTIVE)
-			KMInput.SetCapture(false);
-		break;
 	case WM_KILLFOCUS:
-		KMInput.SetCapture(false);
-		KMInput.ClearAllState();
+		g_KBMInput.ClearAllState();
+		g_KBMInput.SetWindowFocused(false);
+		if (g_KBMInput.IsMouseGrabbed())
+			g_KBMInput.SetMouseGrabbed(false);
 		break;
 
 	case WM_SETCURSOR:
@@ -415,6 +452,92 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			return TRUE;
 		}
 		return DefWindowProc(hWnd, message, wParam, lParam);
+
+	case WM_SETFOCUS:
+		g_KBMInput.SetWindowFocused(true);
+		break;
+
+	case WM_KEYDOWN:
+	case WM_SYSKEYDOWN:
+	{
+		int vk = (int)wParam;
+		if (vk == VK_F11)
+		{
+			ToggleFullscreen();
+			break;
+		}
+		if (vk == VK_SHIFT)
+			vk = (MapVirtualKey((lParam >> 16) & 0xFF, MAPVK_VSC_TO_VK_EX) == VK_RSHIFT) ? VK_RSHIFT : VK_LSHIFT;
+		else if (vk == VK_CONTROL)
+			vk = (lParam & (1 << 24)) ? VK_RCONTROL : VK_LCONTROL;
+		else if (vk == VK_MENU)
+			vk = (lParam & (1 << 24)) ? VK_RMENU : VK_LMENU;
+		g_KBMInput.OnKeyDown(vk);
+		break;
+	}
+	case WM_KEYUP:
+	case WM_SYSKEYUP:
+	{
+		int vk = (int)wParam;
+		if (vk == VK_SHIFT)
+			vk = (MapVirtualKey((lParam >> 16) & 0xFF, MAPVK_VSC_TO_VK_EX) == VK_RSHIFT) ? VK_RSHIFT : VK_LSHIFT;
+		else if (vk == VK_CONTROL)
+			vk = (lParam & (1 << 24)) ? VK_RCONTROL : VK_LCONTROL;
+		else if (vk == VK_MENU)
+			vk = (lParam & (1 << 24)) ? VK_RMENU : VK_LMENU;
+		g_KBMInput.OnKeyUp(vk);
+		break;
+	}
+
+	case WM_LBUTTONDOWN:
+		g_KBMInput.OnMouseButtonDown(KeyboardMouseInput::MOUSE_LEFT);
+		break;
+	case WM_LBUTTONUP:
+		g_KBMInput.OnMouseButtonUp(KeyboardMouseInput::MOUSE_LEFT);
+		break;
+	case WM_RBUTTONDOWN:
+		g_KBMInput.OnMouseButtonDown(KeyboardMouseInput::MOUSE_RIGHT);
+		break;
+	case WM_RBUTTONUP:
+		g_KBMInput.OnMouseButtonUp(KeyboardMouseInput::MOUSE_RIGHT);
+		break;
+	case WM_MBUTTONDOWN:
+		g_KBMInput.OnMouseButtonDown(KeyboardMouseInput::MOUSE_MIDDLE);
+		break;
+	case WM_MBUTTONUP:
+		g_KBMInput.OnMouseButtonUp(KeyboardMouseInput::MOUSE_MIDDLE);
+		break;
+
+	case WM_MOUSEMOVE:
+		g_KBMInput.OnMouseMove(LOWORD(lParam), HIWORD(lParam));
+		break;
+
+	case WM_MOUSEWHEEL:
+		g_KBMInput.OnMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
+		break;
+
+	case WM_MOUSEMOVE:
+		KMInput.OnMouseMove(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		break;
+
+	case WM_INPUT:
+		{
+			UINT dwSize = 0;
+			GetRawInputData((HRAWINPUT)lParam, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER));
+			if (dwSize > 0 && dwSize <= 256)
+			{
+				BYTE rawBuffer[256];
+				if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, rawBuffer, &dwSize, sizeof(RAWINPUTHEADER)) == dwSize)
+				{
+					RAWINPUT* raw = (RAWINPUT*)rawBuffer;
+					if (raw->header.dwType == RIM_TYPEMOUSE)
+					{
+						g_KBMInput.OnRawMouseDelta(raw->data.mouse.lLastX, raw->data.mouse.lLastY);
+					}
+				}
+			}
+		}
+		break;
 
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
@@ -677,7 +800,7 @@ void ToggleFullscreen()
 		{
 			SetWindowLong(g_hWnd, GWL_STYLE, dwStyle & ~WS_OVERLAPPEDWINDOW);
 			SetWindowPos(g_hWnd, HWND_TOP,
-				mi.rcMonitor.left, mi.rcMonitor.top,
+						 mi.rcMonitor.left, mi.rcMonitor.top,
 				mi.rcMonitor.right - mi.rcMonitor.left,
 				mi.rcMonitor.bottom - mi.rcMonitor.top,
 				SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
@@ -688,7 +811,7 @@ void ToggleFullscreen()
 		SetWindowLong(g_hWnd, GWL_STYLE, dwStyle | WS_OVERLAPPEDWINDOW);
 		SetWindowPlacement(g_hWnd, &g_wpPrev);
 		SetWindowPos(g_hWnd, NULL, 0, 0, 0, 0,
-			SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+					 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
 	}
 	g_isFullscreen = !g_isFullscreen;
 }
@@ -698,6 +821,9 @@ void ToggleFullscreen()
 //--------------------------------------------------------------------------------------
 void CleanupDevice()
 {
+	extern void Windows64_RestoreGamma();
+	Windows64_RestoreGamma();
+
 	if( g_pImmediateContext ) g_pImmediateContext->ClearState();
 
 	if( g_pRenderTargetView ) g_pRenderTargetView->Release();
@@ -715,6 +841,25 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 {
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
+
+	WCHAR exePath[MAX_PATH] = { 0 };
+	GetModuleFileNameW(NULL, exePath, MAX_PATH);
+	WCHAR* lastSlash = wcsrchr(exePath, L'\\');
+	if (lastSlash) {
+		*lastSlash = L'\0';
+
+		WCHAR devCheckPath[MAX_PATH] = { 0 };
+		swprintf_s(devCheckPath, MAX_PATH, L"%s\\..\\..\\Minecraft.Client\\Minecraft.Client.vcxproj", exePath);
+
+		if (GetFileAttributesW(devCheckPath) != INVALID_FILE_ATTRIBUTES) {
+			WCHAR projectPath[MAX_PATH] = { 0 };
+			swprintf_s(projectPath, MAX_PATH, L"%s\\..\\..\\Minecraft.Client", exePath);
+			SetCurrentDirectoryW(projectPath);
+		}
+		else {
+			SetCurrentDirectoryW(exePath);
+		}
+	}
 
 	// Declare DPI awareness so GetSystemMetrics returns physical pixels
 	SetProcessDPIAware();
@@ -749,8 +894,32 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 			//g_iScreenWidth = 960;
 			//g_iScreenHeight = 544;
 		}
+
+		char cmdLineA[1024];
+		strncpy_s(cmdLineA, sizeof(cmdLineA), lpCmdLine, _TRUNCATE);
+
+		char *nameArg = strstr(cmdLineA, "-name ");
+		if (nameArg)
+		{
+			nameArg += 6;
+			while (*nameArg == ' ') nameArg++;
+			char nameBuf[17];
+			int n = 0;
+			while (nameArg[n] && nameArg[n] != ' ' && n < 16) { nameBuf[n] = nameArg[n]; n++; }
+			nameBuf[n] = 0;
+			strncpy_s(g_Win64Username, 17, nameBuf, _TRUNCATE);
+		}
 	}
 
+	if (g_Win64Username[0] == 0)
+	{
+		DWORD sz = 17;
+		if (!GetUserNameA(g_Win64Username, &sz))
+			strncpy_s(g_Win64Username, 17, "Player", _TRUNCATE);
+		g_Win64Username[16] = 0;
+	}
+
+	MultiByteToWideChar(CP_ACP, 0, g_Win64Username, -1, g_Win64UsernameW, 17);
 
 	// Initialize global strings
 	MyRegisterClass(hInstance);
@@ -824,7 +993,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	app.loadMediaArchive();
 
 	RenderManager.Initialise(g_pd3dDevice, g_pSwapChain);
-
+	
 	app.loadStringTable();
 	ui.init(g_pd3dDevice,g_pImmediateContext,g_pRenderTargetView,g_pDepthStencilView,g_iScreenWidth,g_iScreenHeight);
 
@@ -835,13 +1004,12 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	// Set the number of possible joypad layouts that the user can switch between, and the number of actions
 	InputManager.Initialise(1,3,MINECRAFT_ACTION_MAX, ACTION_MAX_MENU);
 
-	// Initialize keyboard/mouse input
-	KMInput.Init(g_hWnd);
-
 	// Set the default joypad action mappings for Minecraft
 	DefineActions();
 	InputManager.SetJoypadMapVal(0,0);
 	InputManager.SetKeyRepeatRate(0.3f,0.2f);
+
+	g_KBMInput.Init();
 
 	// Initialise the profile manager with the game Title ID, Offer ID, a profile version number, and the number of profile values and settings
 	ProfileManager.Initialise(TITLEID_MINECRAFT,
@@ -915,6 +1083,18 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	// XN_SYS_SIGNINCHANGED notifications. This does mean that we need to have a callback in the
 	// ProfileManager for XN_LIVE_INVITE_ACCEPTED for QNet.
 	g_NetworkManager.Initialise();
+
+	for (int i = 0; i < MINECRAFT_NET_MAX_PLAYERS; i++)
+	{
+		IQNet::m_player[i].m_smallId = (BYTE)i;
+		IQNet::m_player[i].m_isRemote = false;
+		IQNet::m_player[i].m_isHostPlayer = (i == 0);
+		swprintf_s(IQNet::m_player[i].m_gamertag, 32, L"Player%d", i);
+	}
+	extern wchar_t g_Win64UsernameW[17];
+	wcscpy_s(IQNet::m_player[0].m_gamertag, 32, g_Win64UsernameW);
+
+	WinsockNetLayer::Initialize();
 
 
 
@@ -1034,14 +1214,18 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	}
 #endif
 	MSG msg = {0};
-	while( WM_QUIT != msg.message && !app.m_bShutdown)
+	while( WM_QUIT != msg.message )
 	{
-		if( PeekMessage( &msg, NULL, 0, 0, PM_REMOVE ) )
+		g_KBMInput.Tick();
+
+		while( PeekMessage( &msg, NULL, 0, 0, PM_REMOVE ) )
 		{
 			TranslateMessage( &msg );
 			DispatchMessage( &msg );
-			continue;
+			if (msg.message == WM_QUIT) break;
 		}
+		if (msg.message == WM_QUIT) break;
+
 		RenderManager.StartFrame();
 #if 0
 		if(pMinecraft->soundEngine->isStreamingWavebankReady() &&
@@ -1063,7 +1247,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 		app.UpdateTime();
 		PIXBeginNamedEvent(0,"Input manager tick");
 		InputManager.Tick();
-		KMInput.Tick();
+
 		PIXEndNamedEvent();
 		PIXBeginNamedEvent(0,"Profile manager tick");
 		//		ProfileManager.Tick();
@@ -1088,7 +1272,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 		PIXEndNamedEvent();
 
 		PIXBeginNamedEvent(0,"Network manager do work #1");
-		//		g_NetworkManager.DoWork();
+		g_NetworkManager.DoWork();
 		PIXEndNamedEvent();
 
 		//		LeaderboardManager::Instance()->Tick();
@@ -1189,30 +1373,6 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 		RenderManager.Set_matrixDirty();
 #endif
 		// Present the frame.
-		RenderManager.Present();
-
-		ui.CheckMenuDisplayed();
-
-		// Update mouse capture: capture when in-game and no menu is open
-		{
-			static bool altToggleSuppressCapture = false;
-			bool shouldCapture = app.GetGameStarted() && !ui.GetMenuDisplayed(0) && pMinecraft->screen == NULL;
-			// Left Alt key toggles capture on/off for debugging
-			if (KMInput.IsKeyPressed(VK_MENU))
-			{
-				if (KMInput.IsCaptured()) { KMInput.SetCapture(false); altToggleSuppressCapture = true; }
-				else if (shouldCapture)   { KMInput.SetCapture(true);  altToggleSuppressCapture = false; }
-			}
-			else if (!shouldCapture)
-			{
-				if (KMInput.IsCaptured()) KMInput.SetCapture(false);
-				altToggleSuppressCapture = false;
-			}
-			else if (shouldCapture && !KMInput.IsCaptured() && GetFocus() == g_hWnd && !altToggleSuppressCapture)
-			{
-				KMInput.SetCapture(true);
-			}
-		}
 
 		// F11 toggles fullscreen
 		if (KMInput.IsKeyPressed(VK_F11))
@@ -1220,7 +1380,39 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 			ToggleFullscreen();
 		}
 
+		#ifdef _DEBUG_MENUS_ENABLED
+		// F3 toggles onscreen debug info
+		if (KMInput.IsKeyPressed(VK_F3))
+		{
+			if (Minecraft* pMinecraft = Minecraft::GetInstance())
+			{
+				if (pMinecraft->options && app.DebugSettingsOn())
+				{
+					pMinecraft->options->renderDebug = !pMinecraft->options->renderDebug;
+				}
+			}
+		}
+
+		// F4 opens debug overlay
+		if (KMInput.IsKeyPressed(VK_F4))
+		{
+			if (Minecraft* pMinecraft = Minecraft::GetInstance())
+			{
+				if (pMinecraft->options && app.DebugSettingsOn() &&
+					app.GetGameStarted() && !ui.GetMenuDisplayed(0) && pMinecraft->screen == NULL)
+				{
+					ui.NavigateToScene(0, eUIScene_DebugOverlay, NULL, eUILayer_Debug);
+				}
+			}
+		}
+
+		#endif
+
+		RenderManager.Present();
+
+		ui.CheckMenuDisplayed();
 #if 0
+		PIXBeginNamedEvent(0,"Profile load check");
 		// has the game defined profile data been changed (by a profile load)
 		if(app.uiGameDefinedDataChangedBitmask!=0)
 		{
@@ -1310,8 +1502,6 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 		// Fix for #7318 - Title crashes after short soak in the leaderboards menu
 		// A memory leak was caused because the icon renderer kept creating new Vec3's because the pool wasn't reset
 		Vec3::resetPool();
-
-		KMInput.EndFrame();
 	}
 
 	// Free resources, unregister custom classes, and exit.

@@ -1017,6 +1017,13 @@ void Gui::render(float a, bool mouseFree, int xMouse, int yMouse)
 		glPopMatrix();
 	}
 
+	if (ClientConstants::SHOW_LCEMP_WATERMARK)
+	{
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		font->drawShadow(L"LCEMP by notpies", 2, screenHeight - 10, 0x55ffffff);
+	}
+
 	glColor4f(1, 1, 1, 1);
     glDisable(GL_BLEND);
 	glEnable(GL_ALPHA_TEST);

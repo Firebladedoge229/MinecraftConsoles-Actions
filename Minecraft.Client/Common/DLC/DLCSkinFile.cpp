@@ -205,9 +205,7 @@ bool DLCSkinFile::getParameterAsBool(DLCManager::EDLCParameterType type)
 	switch(type)
 	{
 	case DLCManager::e_DLCParamType_Free:
-		// Patch all DLC to be "paid"
-		return false;
-		// return m_bIsFree;
+		return m_bIsFree;
 	default:
 		return false;
 	}

@@ -274,13 +274,11 @@ void LocalPlayer::aiStep()
     if (changingDimensionDelay > 0) changingDimensionDelay--;
 	bool wasJumping = input->jumping;
 	float runTreshold = 0.8f;
-	float sprintForward = input->sprintForward;
 
-	bool wasRunning = sprintForward >= runTreshold;
+	bool wasRunning = input->ya >= runTreshold;
 	//input->tick( dynamic_pointer_cast<Player>( shared_from_this() ) );
 	// 4J-PB - make it a localplayer
 	input->tick( this );
-	sprintForward = input->sprintForward;
 	if (isUsingItem())
 	{
 		input->xa *= 0.2f;
@@ -304,30 +302,10 @@ void LocalPlayer::aiStep()
 	// world with low food, then reload it in creative.
 	if(abilities.mayfly || isAllowedToFly() ) enoughFoodToSprint = true;
 
-	bool forwardEnoughToTriggerSprint = sprintForward >= runTreshold;
-	bool forwardReturnedToDeadzone = sprintForward == 0.0f;
-	bool forwardEnoughToContinueSprint = sprintForward >= runTreshold;
-
-#ifdef _WINDOWS64
-	if (GetXboxPad() == 0 && input->usingKeyboardMovement)
-	{
-		forwardEnoughToContinueSprint = sprintForward > 0.0f;
-	}
-#endif
-
-#ifdef _WINDOWS64
-	// Keyboard sprint: Ctrl held while moving forward
-	if (GetXboxPad() == 0 && input->usingKeyboardMovement && KMInput.IsKeyDown(VK_CONTROL) && sprintForward > 0.0f &&
-		enoughFoodToSprint && !isUsingItem() && !hasEffect(MobEffect::blindness) && onGround)
-	{
-		if (!isSprinting()) setSprinting(true);
-	}
-#endif
-
 	// 4J - altered this slightly to make sure that the joypad returns to below returnTreshold in between registering two movements up to runThreshold
 	if (onGround && !isSprinting() && enoughFoodToSprint && !isUsingItem() && !hasEffect(MobEffect::blindness))
 	{
-		if( !wasRunning && forwardEnoughToTriggerSprint )
+		if( !wasRunning && input->ya >= runTreshold )
 		{
 			if (sprintTriggerTime == 0)
 			{
@@ -344,7 +322,7 @@ void LocalPlayer::aiStep()
 				}
 			}
 		}
-		else if( ( sprintTriggerTime > 0 ) && forwardReturnedToDeadzone )		// zero sprintForward here signifies that we have returned to the deadzone
+		else if( ( sprintTriggerTime > 0 ) && ( input->ya == 0.0f ) )		// ya of 0.0f here signifies that we have returned to the deadzone
 		{
 			sprintTriggerRegisteredReturn = true;
 		}
@@ -352,7 +330,7 @@ void LocalPlayer::aiStep()
 	if (isSneaking()) sprintTriggerTime = 0;
 	// 4J-PB - try not stopping sprint on collision
 	//if (isSprinting() && (input->ya < runTreshold || horizontalCollision || !enoughFoodToSprint))
-	if (isSprinting() && (!forwardEnoughToContinueSprint || !enoughFoodToSprint || isSneaking() || isUsingItem()))
+	if (isSprinting() && (input->ya < runTreshold || !enoughFoodToSprint))
 	{
 		setSprinting(false);
 	}	
@@ -462,9 +440,14 @@ void LocalPlayer::aiStep()
 			if( isSprinting() )
 			{
 				// Accelrate up to full speed if we are sprinting, moving in the direction of the view vector
-				flyX = (float)viewVector->x * input->ya;
+				float yawRad = yRot * (PI / 180.0f);
+
+				flyX = -sinf(yawRad) * input->ya + cosf(yawRad) * input->xa;
 				flyY = (float)viewVector->y * input->ya;
-				flyZ = (float)viewVector->z * input->ya;
+				flyZ = cosf(yawRad) * input->ya + sinf(yawRad) * input->xa;
+
+				float h = sqrtf(flyX * flyX + flyZ * flyZ);
+				if (h > 1.0f) { flyX /= h; flyZ /= h; }
 
 				float scale = ((float)(SPRINT_DURATION - sprintTime))/10.0f;
 				scale = scale * scale;
@@ -1635,3 +1618,4 @@ void LocalPlayer::SetPlayerAdditionalModelParts(vector<ModelPart *>pAdditionalMo
 {
 	m_pAdditionalModelParts=pAdditionalModelParts;
 }
+

@@ -13,6 +13,10 @@
 #include <pad.h>
 #endif
 
+#ifdef _WINDOWS64
+#include "..\..\KeyboardMouseInput.h"
+#endif
+
 IUIScene_AbstractContainerMenu::IUIScene_AbstractContainerMenu()
 {
 	m_menu = NULL;
@@ -460,6 +464,28 @@ void IUIScene_AbstractContainerMenu::onMouseTick()
 		}
 
 #ifdef __ORBIS__
+	}
+#endif
+
+#ifdef _WINDOWS64
+	if (!g_KBMInput.IsMouseGrabbed())
+	{
+		int dx = g_KBMInput.GetMouseDeltaX();
+		int dy = g_KBMInput.GetMouseDeltaY();
+		if (dx != 0 || dy != 0)
+		{
+			float sensitivity = (float)app.GetGameSettings(iPad, eGameSetting_Sensitivity_InMenu) / 100.0f;
+			float mouseScale = sensitivity * 1.0f;
+			vPointerPos.x += (float)dx * mouseScale;
+			vPointerPos.y += (float)dy * mouseScale;
+			
+			if (vPointerPos.x < m_fPointerMinX) vPointerPos.x = m_fPointerMinX;
+			else if (vPointerPos.x > m_fPointerMaxX) vPointerPos.x = m_fPointerMaxX;
+			if (vPointerPos.y < m_fPointerMinY) vPointerPos.y = m_fPointerMinY;
+			else if (vPointerPos.y > m_fPointerMaxY) vPointerPos.y = m_fPointerMaxY;
+
+			bStickInput = true;
+		}
 	}
 #endif
 

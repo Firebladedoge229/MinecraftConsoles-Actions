@@ -20,6 +20,10 @@
 
 Random *PendingConnection::random = new Random();
 
+#ifdef _WINDOWS64
+bool g_bRejectDuplicateNames = true;
+#endif
+
 PendingConnection::PendingConnection(MinecraftServer *server, Socket *socket, const wstring& id)
 {
 	// 4J - added initialisers
@@ -166,6 +170,30 @@ void PendingConnection::handleLogin(shared_ptr<LoginPacket> packet)
 	{
 		disconnect(DisconnectPacket::eDisconnect_Banned);
 	}
+#ifdef _WINDOWS64
+	else if( g_bRejectDuplicateNames )
+	{
+		bool nameTaken = false;
+		vector<shared_ptr<ServerPlayer> > &pl = server->getPlayers()->players;
+		for (unsigned int i = 0; i < pl.size(); i++)
+		{
+			if (pl[i] != NULL && pl[i]->name == name)
+			{
+				nameTaken = true;
+				break;
+			}
+		}
+		if (nameTaken)
+		{
+			app.DebugPrintf("Rejecting duplicate name: %ls\n", name.c_str());
+			disconnect(DisconnectPacket::eDisconnect_Banned);
+		}
+		else
+		{
+			handleAcceptedLogin(packet);
+		}
+	}
+#endif
 	else
 	{
         handleAcceptedLogin(packet);
@@ -230,7 +258,7 @@ void PendingConnection::onDisconnect(DisconnectPacket::eDisconnectReason reason,
 void PendingConnection::handleGetInfo(shared_ptr<GetInfoPacket> packet)
 {
 	//try {
-	//String message = server->motd + "§" + server->players->getPlayerCount() + "§" + server->players->getMaxPlayers();
+	//String message = server->motd + "ï¿½" + server->players->getPlayerCount() + "ï¿½" + server->players->getMaxPlayers();
 	//connection->send(new DisconnectPacket(message));
 	connection->send(shared_ptr<DisconnectPacket>(new DisconnectPacket(DisconnectPacket::eDisconnect_ServerFull) ) );
 	connection->sendAndQuit();

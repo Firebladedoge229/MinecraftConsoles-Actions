@@ -592,8 +592,6 @@ bool MultiPlayerLevel::doSetTileAndData(int x, int y, int z, int tile, int data)
 	{
 		if( g_NetworkManager.IsHost() && visuallyImportant )
 		{
-			// 4J Stu - This got removed from the tileUpdated function in TU14. Adding it back here as we need it
-			// to handle the cases where the chunk data is shared so the normal paths never call this
 			sendTileUpdated(x,y,z);
 
 			tileUpdated(x, y, z, tile);

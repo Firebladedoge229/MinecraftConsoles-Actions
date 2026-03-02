@@ -8,6 +8,9 @@
 #include "..\..\TexturePackRepository.h"
 #include "..\..\Minecraft.h"
 #include "..\..\..\Minecraft.World\net.minecraft.world.entity.boss.enderdragon.h"
+#ifdef _WINDOWS64
+#include "..\..\KeyboardMouseInput.h"
+#endif
 #include "..\..\EnderDragonRenderer.h"
 #include "..\..\MultiPlayerLocalPlayer.h"
 #include "UIFontData.h"
@@ -432,25 +435,25 @@ void UIController::loadSkins()
 	}
 	else
 	{
-		platformSkinPath = L"skinWin.swf";
+		platformSkinPath = L"skinWin.swf";	
 	}
 #elif defined _DURANGO
 	if(m_fScreenHeight>=1080.0f)
 	{
-		platformSkinPath = L"skinHDDurango.swf";
+		platformSkinPath = L"skinHDDurango.swf";	
 	}
 	else
 	{
-		platformSkinPath = L"skinDurango.swf";
+		platformSkinPath = L"skinDurango.swf";	
 	}
 #elif defined __ORBIS__
 	if(m_fScreenHeight>=1080.0f)
 	{
-		platformSkinPath = L"skinHDOrbis.swf";
+		platformSkinPath = L"skinHDOrbis.swf";	
 	}
 	else
 	{
-		platformSkinPath = L"skinOrbis.swf";
+		platformSkinPath = L"skinOrbis.swf";	
 	}
 
 #endif
@@ -920,27 +923,37 @@ void UIController::handleKeyPress(unsigned int iPad, unsigned int key)
 	released = InputManager.ButtonReleased(iPad,key); // Toggle
 
 #ifdef _WINDOWS64
-	// Keyboard menu input for player 0
 	if (iPad == 0)
 	{
-		bool kbDown = false, kbPressed = false, kbReleased = false;
-		switch(key)
+		int vk = 0;
+		switch (key)
 		{
-			case ACTION_MENU_UP:        kbDown = KMInput.IsKeyDown(VK_UP);     kbPressed = KMInput.IsKeyPressed(VK_UP);     kbReleased = KMInput.IsKeyReleased(VK_UP);     break;
-			case ACTION_MENU_DOWN:      kbDown = KMInput.IsKeyDown(VK_DOWN);   kbPressed = KMInput.IsKeyPressed(VK_DOWN);   kbReleased = KMInput.IsKeyReleased(VK_DOWN);   break;
-			case ACTION_MENU_LEFT:      kbDown = KMInput.IsKeyDown(VK_LEFT);   kbPressed = KMInput.IsKeyPressed(VK_LEFT);   kbReleased = KMInput.IsKeyReleased(VK_LEFT);   break;
-			case ACTION_MENU_RIGHT:     kbDown = KMInput.IsKeyDown(VK_RIGHT);  kbPressed = KMInput.IsKeyPressed(VK_RIGHT);  kbReleased = KMInput.IsKeyReleased(VK_RIGHT);  break;
-			case ACTION_MENU_OK:        kbDown = KMInput.IsKeyDown(VK_RETURN); kbPressed = KMInput.IsKeyPressed(VK_RETURN); kbReleased = KMInput.IsKeyReleased(VK_RETURN); break;
-			case ACTION_MENU_A:         kbDown = KMInput.IsKeyDown(VK_RETURN); kbPressed = KMInput.IsKeyPressed(VK_RETURN); kbReleased = KMInput.IsKeyReleased(VK_RETURN); break;
-			case ACTION_MENU_CANCEL:    kbDown = KMInput.IsKeyDown(VK_ESCAPE); kbPressed = KMInput.IsKeyPressed(VK_ESCAPE); kbReleased = KMInput.IsKeyReleased(VK_ESCAPE); break;
-			case ACTION_MENU_B:         kbDown = KMInput.IsKeyDown(VK_ESCAPE); kbPressed = KMInput.IsKeyPressed(VK_ESCAPE); kbReleased = KMInput.IsKeyReleased(VK_ESCAPE); break;
-			case ACTION_MENU_PAUSEMENU: kbDown = KMInput.IsKeyDown(VK_ESCAPE); kbPressed = KMInput.IsKeyPressed(VK_ESCAPE); kbReleased = KMInput.IsKeyReleased(VK_ESCAPE); break;
-			case ACTION_MENU_LEFT_SCROLL: kbDown = KMInput.IsKeyDown('Q'); kbPressed = KMInput.IsKeyPressed('Q'); kbReleased = KMInput.IsKeyReleased('Q'); break;
-			case ACTION_MENU_RIGHT_SCROLL: kbDown = KMInput.IsKeyDown('E'); kbPressed = KMInput.IsKeyPressed('E'); kbReleased = KMInput.IsKeyReleased('E'); break;
+		case ACTION_MENU_OK:    case ACTION_MENU_A: vk = VK_RETURN; break;
+		case ACTION_MENU_CANCEL: case ACTION_MENU_B: vk = VK_ESCAPE; break;
+		case ACTION_MENU_UP:    vk = VK_UP;     break;
+		case ACTION_MENU_DOWN:  vk = VK_DOWN;   break;
+		case ACTION_MENU_LEFT:  vk = VK_LEFT;   break;
+		case ACTION_MENU_RIGHT: vk = VK_RIGHT;  break;
+		case ACTION_MENU_X:     vk = 'E';       break;
+		case ACTION_MENU_Y:     vk = VK_TAB;    break;
+		case ACTION_MENU_LEFT_SCROLL:  vk = 'Q'; break;
+		case ACTION_MENU_RIGHT_SCROLL: vk = 'R'; break;
+		case ACTION_MENU_PAGEUP:   vk = VK_PRIOR; break;
+		case ACTION_MENU_PAGEDOWN: vk = VK_NEXT;  break;
 		}
-		pressed = pressed || kbPressed;
-		released = released || kbReleased;
-		down = down || kbDown;
+		if (vk != 0)
+		{
+			if (g_KBMInput.IsKeyPressed(vk))  { pressed = true; down = true; }
+			if (g_KBMInput.IsKeyReleased(vk)) { released = true; down = false; }
+			if (!pressed && !released && g_KBMInput.IsKeyDown(vk)) { down = true; }
+		}
+
+		if ((key == ACTION_MENU_OK || key == ACTION_MENU_A) && !g_KBMInput.IsMouseGrabbed())
+		{
+			if (g_KBMInput.IsMouseButtonPressed(KeyboardMouseInput::MOUSE_LEFT))  { pressed = true; down = true; }
+			if (g_KBMInput.IsMouseButtonReleased(KeyboardMouseInput::MOUSE_LEFT)) { released = true; down = false; }
+			if (!pressed && !released && g_KBMInput.IsMouseButtonDown(KeyboardMouseInput::MOUSE_LEFT)) { down = true; }
+		}
 	}
 #endif
 
